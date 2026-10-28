@@ -1,69 +1,176 @@
 /**
  * ==============================================================================
- * CENTRAL DIRECT LINK & ADS MANAGER (To Fact - tofact.biz.id)
+ * CENTRAL DIRECT LINK & SMARTLINK MANAGER (tofact.biz.id)
  * ==============================================================================
- * Cukup masukkan URL Direct Link Anda di baris di bawah ini SATU KALI SAJA.
- * Pengaturan ini otomatis berlaku untuk Beranda dan SEMUA 213 Artikel!
+ * Mengarahkan setiap klik link artikel langsung ke URL direct link sponsor
+ * dengan parameter query {QUERY} otomatis terisi judul artikel yang diklik.
  * ==============================================================================
  */
 
-// 1. MASUKKAN LINK IKLAN DIRECT LINK ANDA DI SINI:
-const DIRECT_LINK_URL = "https://www.profitablecpmratenetwork.com/MASUKKAN_LINK_ANDA_DI_SINI";
+// 1. URL TARGET DIRECT LINK SPONSOR
+const DIRECT_LINK_TEMPLATE = "https://tutaniaunfastrothermuck.com/NarbK4ffacdda7b2c20d6896e4223d8738217c26f943f?q={QUERY}";
 
-// 2. PILIH METODE PENGALIHAN (Ubah true/false sesuai strategi Anda):
+// 2. KONFIGURASI PERILAKU
 const CONFIG = {
-    // [Mode 1] AUTO REDIRECT: Begitu halaman dibuka, langsung dialihkan ke direct link
-    autoRedirect: true,
-    redirectDelayMs: 0, // 0 = instan tanpa jeda, 1000 = jeda 1 detik
+    // Setiap klik link artikel langsung diarahkan ke direct link
+    interceptArticleClicks: true,
 
-    // [Mode 2] KLIK DI MANA SAJA (Click-Under): Direct link terbuka saat pengunjung klik pertama kali di layar
-    clickAnywhere: false,
-    openInNewTab: true, // true = buka tab baru (pengunjung tetap di web Anda), false = alihkan tab aktif
+    // Ganti atribut href artikel di halaman agar saat di-hover/tengah-klik langsung menuju direct link
+    rewriteHrefs: true,
 
-    // [Mode 3] BACK BUTTON REDIRECT: Saat pengunjung menekan tombol 'Kembali' di browser, arahkan ke direct link
-    backButtonRedirect: false
+    // Auto-redirect jika pengunjung membuka/mendarat langsung di halaman artikel (articleX.html)
+    autoRedirectOnArticle: true,
+    articleRedirectDelayMs: 0, // 0 = instan tanpa jeda
+
+    // Klik di mana saja saat berada di halaman artikel mengarah ke direct link
+    clickAnywhereOnArticle: true
 };
 
 // ==============================================================================
-// SISTEM ENGINE DIRECT LINK (JANGAN DIUBAH KECUALI PAHAM)
+// SISTEM ENGINE PENGALIHAN CERDAS
 // ==============================================================================
 (function () {
-    const isLinkValid = DIRECT_LINK_URL && !DIRECT_LINK_URL.includes("MASUKKAN_LINK_ANDA_DI_SINI");
-    if (!isLinkValid) return;
-
-    // Eksekusi Mode 1: Auto Redirect
-    if (CONFIG.autoRedirect) {
-        if (CONFIG.redirectDelayMs > 0) {
-            setTimeout(function () {
-                window.location.replace(DIRECT_LINK_URL);
-            }, CONFIG.redirectDelayMs);
-        } else {
-            window.location.replace(DIRECT_LINK_URL);
-        }
+    function cleanQuery(text) {
+        if (!text) return "";
+        let clean = text.replace(/<[^>]+>/g, " ");
+        clean = clean.replace(/Trending now/gi, "");
+        clean = clean.replace(/John Doe/gi, "");
+        clean = clean.replace(/[A-Za-z]+\s\d{1,2},\s\d{4}/g, ""); // Hapus format tanggal
+        clean = clean.replace(/TOFACT/gi, "");
+        clean = clean.replace(/IT Magazine/gi, "");
+        clean = clean.replace(/\|\s*To Fact/gi, "");
+        clean = clean.replace(/\s+/g, " ").trim();
+        return clean;
     }
 
-    // Eksekusi Mode 2: Klik Pertama di Mana Saja
-    if (CONFIG.clickAnywhere) {
-        let hasTriggered = false;
-        function handleClick() {
-            if (!hasTriggered) {
-                hasTriggered = true;
-                if (CONFIG.openInNewTab) {
-                    window.open(DIRECT_LINK_URL, "_blank");
-                } else {
-                    window.location.href = DIRECT_LINK_URL;
-                }
+    function buildDirectLink(rawQuery) {
+        let q = cleanQuery(rawQuery);
+        if (!q || q.length < 3) q = "Technology Trends 2026";
+        return DIRECT_LINK_TEMPLATE.replace("{QUERY}", encodeURIComponent(q));
+    }
+
+    function extractQueryFromLink(linkEl) {
+        if (!linkEl) return "Technology Insights";
+
+        // 1. Heading di dalam link
+        const heading = linkEl.querySelector("h1, h2, h3, h4, h5, .trending-title, .article-title");
+        if (heading && heading.textContent.trim()) {
+            return cleanQuery(heading.textContent);
+        }
+
+        // 2. Heading di container/card pembungkus
+        const card = linkEl.closest(".hero-item, .dont-miss-main, .dont-miss-small, .list-post, .trending-bar, .article-card, article, li, div");
+        if (card) {
+            const cardHeading = card.querySelector("h1, h2, h3, h4, h5, .trending-title, .article-title");
+            if (cardHeading && cardHeading.textContent.trim()) {
+                return cleanQuery(cardHeading.textContent);
             }
         }
-        window.addEventListener("click", handleClick, { once: true });
-        window.addEventListener("touchstart", handleClick, { once: true });
+
+        // 3. Teks link langsung
+        const text = linkEl.textContent.trim();
+        if (text && text.length > 5 && !/read more|view all|more|details|home/i.test(text)) {
+            return cleanQuery(text);
+        }
+
+        // 4. Atribut alt gambar
+        const img = linkEl.querySelector("img[alt]");
+        if (img && img.alt && !/featured|ad|banner|image/i.test(img.alt)) {
+            return cleanQuery(img.alt);
+        }
+
+        // 5. Fallback nomor artikel
+        const href = linkEl.getAttribute("href") || "";
+        const m = href.match(/article(\d+)/i);
+        if (m) {
+            return "Technology Trends Article " + m[1];
+        }
+
+        return "Technology Trends";
     }
 
-    // Eksekusi Mode 3: Back Button Redirect
-    if (CONFIG.backButtonRedirect) {
-        history.pushState(null, null, location.href);
-        window.addEventListener("popstate", function () {
-            window.location.replace(DIRECT_LINK_URL);
+    function rewriteAllArticleLinks() {
+        if (!CONFIG.rewriteHrefs) return;
+        const links = document.querySelectorAll('a[href*="article"], a[href*="articles/"]');
+        links.forEach(function (link) {
+            const query = extractQueryFromLink(link);
+            const directUrl = buildDirectLink(query);
+            link.setAttribute("data-direct-url", directUrl);
+            link.setAttribute("href", directUrl);
+            link.setAttribute("target", "_self");
         });
+    }
+
+    // Intersepsi Klik Artikel (Fase Capture agar langsung redirect sebelum script lain)
+    if (CONFIG.interceptArticleClicks) {
+        document.addEventListener(
+            "click",
+            function (e) {
+                const link = e.target.closest('a[href*="article"], a[href*="articles/"], a[data-direct-url]');
+                if (link) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const directUrl = link.getAttribute("data-direct-url") || buildDirectLink(extractQueryFromLink(link));
+                    window.location.href = directUrl;
+                    return false;
+                }
+            },
+            true
+        );
+
+        // Dukungan layar sentuh / mobile
+        document.addEventListener(
+            "touchend",
+            function (e) {
+                const link = e.target.closest('a[href*="article"], a[href*="articles/"], a[data-direct-url]');
+                if (link) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const directUrl = link.getAttribute("data-direct-url") || buildDirectLink(extractQueryFromLink(link));
+                    window.location.href = directUrl;
+                    return false;
+                }
+            },
+            { capture: true, passive: false }
+        );
+    }
+
+    // Jalankan rewrite link begitu DOM siap
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", rewriteAllArticleLinks);
+    } else {
+        rewriteAllArticleLinks();
+    }
+    window.addEventListener("load", rewriteAllArticleLinks);
+
+    // Pengalihan jika membuka halaman artikel secara langsung (articleX.html)
+    const isArticlePage = window.location.pathname.includes("/articles/") || /article\d+\.html/i.test(window.location.pathname);
+    if (isArticlePage) {
+        function getArticleDirectUrl() {
+            const heading = document.querySelector("h1.article-title") || document.querySelector("h1") || document.querySelector(".article-title");
+            const rawTitle = heading ? heading.textContent : document.title;
+            return buildDirectLink(rawTitle);
+        }
+
+        if (CONFIG.autoRedirectOnArticle) {
+            const targetUrl = getArticleDirectUrl();
+            if (CONFIG.articleRedirectDelayMs > 0) {
+                setTimeout(function () {
+                    window.location.replace(targetUrl);
+                }, CONFIG.articleRedirectDelayMs);
+            } else {
+                window.location.replace(targetUrl);
+            }
+        }
+
+        if (CONFIG.clickAnywhereOnArticle) {
+            window.addEventListener(
+                "click",
+                function () {
+                    window.location.href = getArticleDirectUrl();
+                },
+                { once: true, capture: true }
+            );
+        }
     }
 })();
