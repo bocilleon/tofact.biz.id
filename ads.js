@@ -8,28 +8,31 @@
  */
 
 // 1. URL TARGET DIRECT LINK SPONSOR
-const DIRECT_LINK_TEMPLATE = "https://tutaniaunfastrothermuck.com/Ukrrt4ffacdda7b2c20d6896e4223d8738217c26f943f?q={QUERY}";
+const DIRECT_LINK_TEMPLATE = "https://tutaniaunfastrothermuck.com/NHrOY4ffacdda7b2c20d6896e4223d8738217c26f943f?q={QUERY}";
 
 // 2. KONFIGURASI PERILAKU
 const CONFIG = {
-    // Setiap klik link artikel langsung diarahkan ke direct link
-    interceptArticleClicks: true,
-
-    // Ganti atribut href artikel di halaman agar saat di-hover/tengah-klik langsung menuju direct link
+    // Ganti atribut href artikel di halaman agar menjadi direct link asli (kebal blokir browser)
     rewriteHrefs: true,
 
-    // Auto-redirect jika pengunjung membuka/mendarat langsung di halaman artikel (articleX.html)
+    // Intersepsi klik pada artikel
+    interceptArticleClicks: true,
+
+    // Auto-redirect jika pengunjung mendarat di halaman artikel (articleX.html)
     autoRedirectOnArticle: true,
     articleRedirectDelayMs: 0, // 0 = instan tanpa jeda
 
-    // Klik di mana saja saat berada di halaman artikel mengarah ke direct link
+    // Klik di mana saja saat berada di halaman artikel langsung masuk ke direct link
     clickAnywhereOnArticle: true
 };
 
 // ==============================================================================
-// SISTEM ENGINE PENGALIHAN CERDAS
+// SISTEM ENGINE PENGALIHAN CERDAS (ANTI-BLOCK & DUAL-ACTION)
 // ==============================================================================
 (function () {
+    if (window.__TOFACT_REDIRECT_INITIALIZED__) return;
+    window.__TOFACT_REDIRECT_INITIALIZED__ = true;
+
     function cleanQuery(text) {
         if (!text) return "";
         let clean = text.replace(/<[^>]+>/g, " ");
@@ -39,18 +42,19 @@ const CONFIG = {
         clean = clean.replace(/TOFACT/gi, "");
         clean = clean.replace(/IT Magazine/gi, "");
         clean = clean.replace(/\|\s*To Fact/gi, "");
+        clean = clean.replace(/Read more/gi, "");
         clean = clean.replace(/\s+/g, " ").trim();
         return clean;
     }
 
     function buildDirectLink(rawQuery) {
         let q = cleanQuery(rawQuery);
-        if (!q || q.length < 3) q = "Technology Trends 2026";
+        if (!q || q.length < 3) q = "Technology Trends";
         return DIRECT_LINK_TEMPLATE.replace("{QUERY}", encodeURIComponent(q));
     }
 
     function extractQueryFromLink(linkEl) {
-        if (!linkEl) return "Technology Insights";
+        if (!linkEl) return "Technology Trends";
 
         // 1. Heading di dalam link
         const heading = linkEl.querySelector("h1, h2, h3, h4, h5, .trending-title, .article-title");
@@ -59,7 +63,7 @@ const CONFIG = {
         }
 
         // 2. Heading di container/card pembungkus
-        const card = linkEl.closest(".hero-item, .dont-miss-main, .dont-miss-small, .list-post, .trending-bar, .article-card, article, li, div");
+        const card = linkEl.closest(".hero-item, .dont-miss-main, .dont-miss-small, .list-post, .trending-bar, .article-card, article, li");
         if (card) {
             const cardHeading = card.querySelector("h1, h2, h3, h4, h5, .trending-title, .article-title");
             if (cardHeading && cardHeading.textContent.trim()) {
@@ -69,7 +73,7 @@ const CONFIG = {
 
         // 3. Teks link langsung
         const text = linkEl.textContent.trim();
-        if (text && text.length > 5 && !/read more|view all|more|details|home/i.test(text)) {
+        if (text && text.length > 3 && !/read more|view all|more|details|home/i.test(text)) {
             return cleanQuery(text);
         }
 
@@ -79,8 +83,8 @@ const CONFIG = {
             return cleanQuery(img.alt);
         }
 
-        // 5. Fallback nomor artikel
-        const href = linkEl.getAttribute("href") || "";
+        // 5. Fallback nomor artikel dari href
+        const href = linkEl.getAttribute("href") || linkEl.getAttribute("data-original-href") || "";
         const m = href.match(/article(\d+)/i);
         if (m) {
             return "Technology Trends Article " + m[1];
@@ -89,57 +93,51 @@ const CONFIG = {
         return "Technology Trends";
     }
 
+    // Rewrite seluruh link artikel menjadi direct link sponsor langsung
     function rewriteAllArticleLinks() {
         if (!CONFIG.rewriteHrefs) return;
-        const links = document.querySelectorAll('a[href*="article"], a[href*="articles/"]');
+        const links = document.querySelectorAll('a[href*="article"], a[href*="articles/"], a[data-article-link]');
         links.forEach(function (link) {
+            const currentHref = link.getAttribute("href") || "";
+            if (currentHref.includes("tutaniaunfastrothermuck.com")) return; // Sudah di-rewrite
+
             const query = extractQueryFromLink(link);
             const directUrl = buildDirectLink(query);
+
+            link.setAttribute("data-original-href", currentHref);
             link.setAttribute("data-direct-url", directUrl);
             link.setAttribute("href", directUrl);
             link.setAttribute("target", "_self");
+            link.setAttribute("rel", "noopener");
         });
     }
 
-    // Intersepsi Klik Artikel (Fase Capture agar langsung redirect sebelum script lain)
+    // Intersepsi Klik Artikel
     if (CONFIG.interceptArticleClicks) {
         document.addEventListener(
             "click",
             function (e) {
-                const link = e.target.closest('a[href*="article"], a[href*="articles/"], a[data-direct-url]');
+                const link = e.target.closest('a[href*="tutaniaunfastrothermuck.com"], a[data-direct-url], a[href*="article"], a[href*="articles/"]');
                 if (link) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const directUrl = link.getAttribute("data-direct-url") || buildDirectLink(extractQueryFromLink(link));
-                    window.location.href = directUrl;
-                    return false;
+                    const directUrl = link.getAttribute("data-direct-url") || 
+                                     (link.href && link.href.includes("tutaniaunfastrothermuck.com") ? link.href : buildDirectLink(extractQueryFromLink(link)));
+                    
+                    if (directUrl) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.location.href = directUrl;
+                        return false;
+                    }
                 }
             },
             true
         );
-
-        // Dukungan layar sentuh / mobile
-        document.addEventListener(
-            "touchend",
-            function (e) {
-                const link = e.target.closest('a[href*="article"], a[href*="articles/"], a[data-direct-url]');
-                if (link) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const directUrl = link.getAttribute("data-direct-url") || buildDirectLink(extractQueryFromLink(link));
-                    window.location.href = directUrl;
-                    return false;
-                }
-            },
-            { capture: true, passive: false }
-        );
     }
 
-    // Jalankan rewrite link begitu DOM siap
+    // Eksekusi secepat mungkin
+    rewriteAllArticleLinks();
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", rewriteAllArticleLinks);
-    } else {
-        rewriteAllArticleLinks();
     }
     window.addEventListener("load", rewriteAllArticleLinks);
 
@@ -152,8 +150,9 @@ const CONFIG = {
             return buildDirectLink(rawTitle);
         }
 
+        const targetUrl = getArticleDirectUrl();
+
         if (CONFIG.autoRedirectOnArticle) {
-            const targetUrl = getArticleDirectUrl();
             if (CONFIG.articleRedirectDelayMs > 0) {
                 setTimeout(function () {
                     window.location.replace(targetUrl);
@@ -167,7 +166,7 @@ const CONFIG = {
             window.addEventListener(
                 "click",
                 function () {
-                    window.location.href = getArticleDirectUrl();
+                    window.location.href = targetUrl;
                 },
                 { once: true, capture: true }
             );
