@@ -8,7 +8,7 @@
  */
 
 // 1. URL TARGET DIRECT LINK SPONSOR
-const DIRECT_LINK_TEMPLATE = "https://tutaniaunfastrothermuck.com/NHrOY4ffacdda7b2c20d6896e4223d8738217c26f943f?q={QUERY}";
+const DIRECT_LINK_TEMPLATE = "https://tutaniaunfastrothermuck.com/O4rG64ffacdda7b2c20d6896e4223d8738217c26f943f?q={QUERY}";
 
 // 2. KONFIGURASI PERILAKU
 const CONFIG = {
